@@ -1,0 +1,61 @@
+db.createCollection("Rooms")
+db.createCollection("Guests")
+db.createCollection("Reservations")
+db.createCollection("Payments")
+
+
+db.Rooms.insertMany([
+    { RoomID: 101, Type: 'Single', Price: 100, Availability: true },
+    { RoomID: 102, Type: 'Double', Price: 150, Availability: true },
+    { RoomID: 103, Type: 'Suite', Price: 300, Availability: true },
+    { RoomID: 104, Type: 'Single', Price: 100, Availability: false },
+    { RoomID: 105, Type: 'Double', Price: 150, Availability: true }
+])
+
+
+db.Rooms.find({
+    Availability: true,
+    RoomID: { $nin: db.Reservations.find({ 
+        $and: [ 
+            { "startDate": { $lte: ISODate("2024-09-10") } }, 
+            { "endDate": { $gte: ISODate("2024-09-01") } }
+        ]
+    }).map(reservation => reservation.RoomID) }
+})
+
+db.Rooms.updateOne(
+    { RoomID: 101 },
+    { $set: { Availability: false } }
+)
+
+db.Reservations.deleteOne({ ReservationID: 1 })
+
+db.Rooms.find({
+    Type: 'Double',
+    Price: { $gte: 100, $lte: 200 }
+})
+
+db.Rooms.find({
+    $or: [
+        { Type: 'Single', Price: { $lt: 120 } },
+        { Type: 'Suite', Price: { $gt: 250 } }
+    ]
+})
+
+
+db.Rooms.find().sort({ Price: 1 })
+
+db.Reservations.aggregate([
+    { $group: { _id: null, totalRevenue: { $sum: "$Price" } } }
+])
+
+db.Reservations.aggregate([
+    { $lookup: {
+        from: "Rooms",
+        localField: "RoomID",
+        foreignField: "RoomID",
+        as: "RoomDetails"
+    }},
+    { $unwind: "$RoomDetails" },
+    { $group: { _id: "$RoomDetails.Type", totalReservations: { $sum: 1 } } }
+])
